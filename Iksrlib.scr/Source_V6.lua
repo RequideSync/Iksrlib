@@ -1188,7 +1188,7 @@ function OrionLib:MakeWindow(WindowConfig)
 				end	
 				return Toggle
 			end  
-			function ElementFunction:AddSlider(SliderConfig)
+			function ElementFunction:AddSlider(SliderConfig)	
 				SliderConfig = SliderConfig or {}
 				SliderConfig.Name = SliderConfig.Name or "Slider"
 				SliderConfig.Min = SliderConfig.Min or 0
@@ -1201,130 +1201,158 @@ function OrionLib:MakeWindow(WindowConfig)
 				SliderConfig.Flag = SliderConfig.Flag or nil
 				SliderConfig.Save = SliderConfig.Save or false
 
-				local Slider = {Value = SliderConfig.Default, Save = SliderConfig.Save}
+				local Slider = {Value = SliderConfig.Default, Save = SliderConfig.Save, Type = "Slider"}
 				local Dragging = false
+				local SliderKnob	
+				local KnobValueText	
+				local FillValueTextLabel	
 
-				local SliderDrag = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
-					Size = UDim2.new(0, 0, 1, 0),
-					BackgroundTransparency = 0.3,
-					ClipsDescendants = true
+				FillValueTextLabel = SetProps(MakeElement("Label", "", 12), {
+					Name = "FillValueText",
+					Size = UDim2.new(1, -10, 1, 0),	
+					Position = UDim2.new(0, 5, 0, 0),	
+					Font = Enum.Font.GothamSemibold,	
+					TextXAlignment = Enum.TextXAlignment.Left,	
+					TextYAlignment = Enum.TextYAlignment.Center,
+					BackgroundTransparency = 1,
+				})
+				AddThemeObject(FillValueTextLabel, "Text")	
+				FillValueTextLabel.TextTransparency = 0	
+
+				local SliderDrag = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {	
+					Name = "SliderDrag",
+					Size = UDim2.new(0, 0, 1, 0),	
+					BackgroundTransparency = 0.3,	
+					ClipsDescendants = true,
+					ZIndex = 2	
 				}), {
-					AddThemeObject(SetProps(MakeElement("Label", "value", 13), {
-						Size = UDim2.new(1, -12, 0, 14),
-						Position = UDim2.new(0, 12, 0, 6),
-						Font = Enum.Font.GothamBold,
-						Name = "Value",
-						TextTransparency = 0
-					}), "Text")
+					FillValueTextLabel	
 				})
 
 				local SliderBar = SetChildren(SetProps(MakeElement("RoundFrame", SliderConfig.Color, 0, 5), {
-					Size = UDim2.new(1, -24, 0, 26),
+					Name = "SliderBar",
+					Size = UDim2.new(1, -24, 0, 26),	
 					Position = UDim2.new(0, 12, 0, 30),
-					BackgroundTransparency = 0.9
+					BackgroundTransparency = 0.9,	
+					ZIndex = 1
 				}), {
-					SetProps(MakeElement("Stroke"), {
-						Color = SliderConfig.Color
+					SetProps(MakeElement("Stroke"), {	
+						Color = SliderConfig.Color,
+						Transparency = 0.5	
 					}),
-					AddThemeObject(SetProps(MakeElement("Label", "value", 13), {
-						Size = UDim2.new(1, -12, 0, 14),
-						Position = UDim2.new(0, 12, 0, 6),
-						Font = Enum.Font.GothamBold,
-						Name = "Value",
-						TextTransparency = 0.8
-					}), "Text"),
-					SliderDrag
+					SliderDrag	
 				})
 
+				SliderKnob = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", nil, 0, 6), {	
+					Name = "SliderKnob",
+					Size = UDim2.new(0, 12, 0, 22),	
+					BackgroundColor3 = OrionLib.Themes[OrionLib.SelectedTheme].Text,	
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(0,0,0.5,0),	
+					ZIndex = SliderBar.ZIndex + 2,	
+					Parent = SliderBar,
+				}),{
+					AddThemeObject(MakeElement("Stroke", nil, 1.5), "Stroke")	
+				}), "Text")	
+
+				KnobValueText = AddThemeObject(SetProps(MakeElement("Label", "", 12), {	
+					Name = "KnobValueText",
+					Size = UDim2.new(0, 60, 0, 16),	
+					AnchorPoint = Vector2.new(0.5, 1),	
+					TextXAlignment = Enum.TextXAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Bottom,	
+					Font = Enum.Font.GothamBold,
+					ZIndex = SliderBar.ZIndex + 3,	
+					BackgroundTransparency = 1,
+					Parent = SliderBar	
+				}), "Text")
+				KnobValueText.TextTransparency = 0	
+
+
 				local SliderFrame = AddThemeObject(SetChildren(SetProps(MakeElement("RoundFrame", Color3.fromRGB(255, 255, 255), 0, 4), {
-					Size = UDim2.new(1, 0, 0, 65),
+					Size = UDim2.new(1, 0, 0, 65),	
 					Parent = ItemParent
 				}), {
 					AddThemeObject(SetProps(MakeElement("Label", SliderConfig.Name, 15), {
 						Size = UDim2.new(1, -12, 0, 14),
-						Position = UDim2.new(0, 12, 0, 10),
+						Position = UDim2.new(0, 12, 0, 10),	
 						Font = Enum.Font.GothamBold,
 						Name = "Content"
 					}), "Text"),
 					AddThemeObject(MakeElement("Stroke"), "Stroke"),
-					SliderBar
+					SliderBar	
 				}), "Second")
 
-				local Dragging, DragInput, MousePos, FramePos = false
+				local knobOriginalSize = SliderKnob.Size
+				local knobPressedSize = UDim2.new(knobOriginalSize.X.Scale, knobOriginalSize.X.Offset + 2, knobOriginalSize.Y.Scale, knobOriginalSize.Y.Offset + 2)
+
 
 				AddConnection(SliderBar.InputBegan, function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
-						Dragging = true
-						MousePos = Input.Position
-						FramePos = SliderBar.Position
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then	
+						Dragging = true	
+						TweenService:Create(SliderKnob, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {Size = knobPressedSize}):Play()	
 
-						AddConnection(Input.Changed, function()
-							if Input.UserInputState == Enum.UserInputState.End then
-								Dragging = false
-								FocusDrag = nil
-							end
-						end)
-					end
+						local interactionPos = Input.Position	
+						if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+							interactionPos = UserInputService:GetMouseLocation()	
+						end
+						local relativeX = interactionPos.X - SliderBar.AbsolutePosition.X
+						local SizeScale = math.clamp(relativeX / SliderBar.AbsoluteSize.X, 0, 1)
+						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale))
+						if OrionLib.SaveCfg and SliderConfig.Save then pcall(SaveCfg, game.GameId) end
+					end	
 				end)
-				AddConnection(SliderBar.InputChanged, function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch and not FocusDrag then
-						DragInput = Input
-						FocusDrag = DragInput
-					end
+				AddConnection(SliderBar.InputEnded, function(Input)	
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then	
+						Dragging = false	
+						TweenService:Create(SliderKnob, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {Size = knobOriginalSize}):Play()	
+						if OrionLib.SaveCfg and SliderConfig.Save then pcall(SaveCfg, game.GameId) end	
+					end	
 				end)
 
 				AddConnection(UserInputService.InputChanged, function(Input)
-					if Input == DragInput and Input == FocusDrag and Dragging then
-						local SizeScale = math.clamp((Input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale)) 
-						SaveCfg(game.GameId)
+					if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then	
+						local interactionPos = Input.Position	
+						if Input.UserInputType == Enum.UserInputType.MouseMovement then
+							interactionPos = UserInputService:GetMouseLocation()
+						end
+						local SizeScale = math.clamp((interactionPos.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+						Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale))	
 					end
 				end)
 
-				--[[
-
-				SliderBar.InputBegan:Connect(function(Input)
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						Dragging = true 
-					end 
-				end)
-				SliderBar.InputEnded:Connect(function(Input) 
-					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then 
-						Dragging = false 
-					end 
-				end)
-
-				SliderBar.MouseButton1Down:Connect(function()
-					local Location;
-					local loop; loop = RunService.Stepped:Connect(function()
-						if Dragging then
-							Location = UserInputService:GetMouseLocation().X
-							local SizeScale = math.clamp((Location - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-							Slider:Set(SliderConfig.Min + ((SliderConfig.Max - SliderConfig.Min) * SizeScale)) 
-							SaveCfg(game.GameId)
-						else
-							loop:Disconnect()
-						end
-					end)
-				end)
-
-				
-				]]--
-
 				function Slider:Set(Value)
 					self.Value = math.clamp(Round(Value, SliderConfig.Increment), SliderConfig.Min, SliderConfig.Max)
-					TweenService:Create(SliderDrag,TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),{Size = UDim2.fromScale((self.Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min), 1)}):Play()
-					SliderBar.Value.Text = tostring(self.Value) .. " " .. SliderConfig.ValueName
-					SliderDrag.Value.Text = tostring(self.Value) .. " " .. SliderConfig.ValueName
-					SliderConfig.Callback(self.Value)
-				end      
+					local percentage = (self.Value - SliderConfig.Min) / (SliderConfig.Max - SliderConfig.Min)
+					if SliderConfig.Max == SliderConfig.Min then percentage = 0 end	
 
-				Slider:Set(Slider.Value)
+					local tweenInfo = TweenInfo.new(.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+					TweenService:Create(SliderDrag, tweenInfo, {Size = UDim2.fromScale(percentage, 1)}):Play()
+					if SliderKnob then
+						TweenService:Create(SliderKnob, tweenInfo, {Position = UDim2.new(percentage, 0, 0.5, 0)}):Play()
+					end
+
+					local displayValue = tostring(self.Value) .. (SliderConfig.ValueName and " " .. SliderConfig.ValueName or "")
+
+					if KnobValueText then
+						KnobValueText.Text = displayValue
+						KnobValueText.Position = UDim2.new(percentage, 0, 0, -5)	
+					end
+
+					if FillValueTextLabel then	
+						FillValueTextLabel.Text = displayValue
+					end
+
+					pcall(SliderConfig.Callback, self.Value)
+				end	 	
+
+				Slider:Set(Slider.Value)	
 				if SliderConfig.Flag then				
 					OrionLib.Flags[SliderConfig.Flag] = Slider
 				end
 				return Slider
-			end  
+			end	
 			function ElementFunction:AddDropdown(DropdownConfig)
 				DropdownConfig = DropdownConfig or {}
 				DropdownConfig.Name = DropdownConfig.Name or "Dropdown"
